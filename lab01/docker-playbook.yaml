@@ -1,0 +1,44 @@
+---
+- name: Docker install
+  hosts: docker
+
+  tasks:
+     - name: Install the latest version of Docker
+       become: true
+       become_user: root
+       apt:
+             name: docker.io
+             state: latest
+
+     - name: Create directory
+       become: true
+       ansible.builtin.file:
+              path: /etc/systemd/system/docker.service.d
+              state: directory
+
+     - name: Copy docker service file with owner and permissions
+       become: true
+       register: service_conf
+       ansible.builtin.copy:
+             src: docker.service
+             dest: /etc/systemd/system/docker.service.d/override.conf
+             owner: root
+             group: root
+             mode: '0644'
+
+     - name: Ensure the docker daemon is enabled
+       become: true
+       become_user: root
+       systemd:
+             name: docker
+             state: started
+             enabled: yes
+             daemon_reload: yes
+
+     - name: Restart daemon on config change
+       become: true
+       become_user: root
+       systemd:
+             name: docker
+             state: restarted
+       when: service_conf.changed

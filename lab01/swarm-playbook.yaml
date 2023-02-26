@@ -1,0 +1,47 @@
+---
+- name: Docker Swarm init
+  any_errors_fatal: true
+  hosts: swarm_manager
+  remote_user: root
+
+  tasks:
+     - name: Ensure the docker daemon is running
+       become: true
+       become_user: root
+       command: systemctl is-active docker
+       register: docker_status
+       failed_when: docker_status.stdout_lines[0] != "active"
+
+     - name: Init Docker Swarm
+       become: true
+       become_user: root
+       command: docker swarm init --advertise-addr {{ ansible_facts.eth0.ipv4.address }}
+       register: swarm_init
+       failed_when: swarm_init.rc != 0
+
+     - name: Get join token
+       become: true
+       become_user: root
+       command: docker swarm join-token -q worker
+       register: join_token
+       failed_when: join_token.rc != 0
+
+- name: Swarm nodes register
+  any_errors_fatal: true
+  hosts: swarm_nodes
+  remote_user: root
+
+  tasks:
+     - name: Ensure the docker daemon is running
+       become: true
+       become_user: root
+       command: systemctl is-active docker
+       register: docker_status
+       failed_when: docker_status.stdout_lines[0] != "active"
+
+     - name: Join swarm
+       become: true
+       become_user: root
+       command: docker swarm join --token {{ hostvars[groups['swarm_manager'][0]]['join_token']['stdout_lines'][0] }} {{ hostvars[groups['swarm_manager'][0]]['ansible_eth0']['ipv4']['address'] }}:2377
+       register: join_status
+       failed_when: join_status.rc != 0

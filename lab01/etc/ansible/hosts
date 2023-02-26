@@ -1,0 +1,11 @@
+[docker]
+<username>vm1[01:10].rtb-lab.pl
+
+[swarm_manager]
+<username>vm101.rtb-lab.pl
+
+[swarm_nodes]
+<username>vm1[02:10].rtb-lab.pl
+
+[registry]
+<username>vm101.rtb-lab.pl

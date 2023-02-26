@@ -1,0 +1,81 @@
+---
+- name: Docker registry install
+  hosts: registry
+
+  tasks:
+     - name: Create certs directory
+       become: true
+       ansible.builtin.file:
+              path: /etc/docker/certs
+              state: directory
+
+     - name: Create registry certs directory
+       become: true
+       ansible.builtin.file:
+               path: /etc/docker/cert.d/{{inventory_hostname}}:5000
+               state: directory
+
+     - name: Create selfsigned cert
+       become: true
+       command: openssl req -newkey rsa:4096 -nodes -sha256 -subj "/C=PL/ST=Warsaw/L=Warsaw/O=Global Security/OU=RTB Department/CN=rtb-lab.pl" -keyout /etc/docker/certs/ca.key -addext "subjectAltName = DNS:{{inventory_hostname}}" -x509 -days 365 -out /etc/docker/certs/ca.crt
+
+     - name: Copy selfsigned cert to system CA
+       become: true
+       command: cp /etc/docker/certs/ca.crt /usr/local/share/ca-certificates/{{inventory_hostname}}.crt
+
+     - name: Copy selfsigned cert to docker registry CA
+       become: true
+       command: cp /etc/docker/certs/ca.crt /etc/docker/cert.d/{{inventory_hostname}}:5000/ca.crt
+
+     - name: Update CA certs
+       become: true
+       command: update-ca-certificates
+
+     - name: Restart docker daemon
+       become: true
+       become_user: root
+       systemd:
+             name: docker
+             state: restarted
+
+     - name: Start registry
+       become: true
+       become_user: root
+       command: docker run -d --restart=always --name registry  -v /etc/docker/certs:/certs -e REGISTRY_HTTP_ADDR=0.0.0.0:443 -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/ca.crt -e REGISTRY_HTTP_TLS_KEY=/certs/ca.key -p 443:443 registry:2
+
+- name: Sync Push task - Executed on source host "{{groups['registry'][0]}}"
+  hosts: docker:!registry
+
+
+  tasks:
+
+     - name: Create registry certs directory
+       become: true
+       ansible.builtin.file:
+          path: /etc/docker/cert.d/{{groups['registry'][0]}}:5000
+          state: directory
+
+
+     - name: Copy the CA file from registry to docker hosts using push method
+       become: true
+       tags: sync-push
+       synchronize:
+             src: "{{ item }}"
+             dest: "{{ item }}"
+             mode: push
+       delegate_to: "{{groups['registry'][0]}}"
+       register: syncfile
+       with_items:
+        - "/etc/docker/cert.d/{{groups['registry'][0]}}:5000/ca.crt"
+        - "/usr/local/share/ca-certificates/{{groups['registry'][0]}}.crt"
+
+     - name: Update CA certs
+       become: true
+       command: update-ca-certificates
+
+     - name: Restart docker daemon
+       become: true
+       become_user: root
+       systemd:
+             name: docker
+             state: restarted
