@@ -81,7 +81,7 @@ nano docker-playbook.yaml
      - name: Install the latest version of Docker
        become: true
        become_user: root
-       yum:
+       apt:
              name: docker.io
              state: latest
      - name: Create directory
