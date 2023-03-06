@@ -1,0 +1,3 @@
+# Rules for user postgres
+
+postgres ALL = NOPASSWD: /usr/sbin/ip, /usr/sbin/arping
