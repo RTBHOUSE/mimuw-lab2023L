@@ -1,0 +1,8 @@
+{"namespace": "com.rtbhouse.nosqllab",
+  "type": "record", "name": "Message",
+  "fields": [
+    {"name": "id", "type": "long"},
+    {"name": "field1", "type": ["null", "string"], "default": null},
+    {"name": "counter", "type": ["null", "long"], "default": null}
+  ]
+}

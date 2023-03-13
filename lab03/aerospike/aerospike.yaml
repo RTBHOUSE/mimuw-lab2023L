@@ -1,0 +1,64 @@
+---
+- name: Aerospike install
+  any_errors_fatal: true
+  hosts: aerospike
+
+  tasks:
+
+     - name: Populate service facts
+       ansible.builtin.service_facts:
+
+     - name: Download Aerospike
+       become: true
+       get_url:
+              url: https://download.aerospike.com/download/server/5.7.0.16/artifact/ubuntu20
+              dest: ~/aerospike.tgz
+              force: true
+       when: ansible_facts.services['aerospike.service'] is not defined
+
+     - name: Decompress Aerospike
+       become: true
+       become_user: root
+       command: bash -c "tar xzvf ~/aerospike.tgz"
+       when: ansible_facts.services['aerospike.service'] is not defined
+
+     - name: Install Aerospike
+       become: true
+       become_user: root
+       command:
+              cmd: bash -c "./asinstall"
+              chdir: aerospike-server-community-5.7.0.16-ubuntu20.04
+       when: ansible_facts.services['aerospike.service'] is not defined
+
+     - name: Create logs directory
+       become: true
+       file:
+              path: /var/log/aerospike
+              state: directory
+
+     - name: Copy config file with owner and permissions
+       become: true
+       register: service_conf
+       template:
+             src: aerospike.conf.j2
+             dest: /etc/aerospike/aerospike.conf
+             owner: root
+             group: root
+             mode: '0644'
+
+     - name: Ensure the Aerospike daemon is enabled
+       become: true
+       become_user: root
+       systemd:
+             name: aerospike
+             state: started
+             enabled: yes
+             daemon_reload: yes
+
+     - name: Restart daemon on config change
+       become: true
+       become_user: root
+       systemd:
+             name: aerospike
+             state: restarted
+       when: service_conf.changed
